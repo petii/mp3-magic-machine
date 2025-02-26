@@ -9,7 +9,7 @@ use lambda_runtime::{tracing, Error, LambdaEvent};
 pub(crate) async fn function_handler(event: LambdaEvent<S3Event>) -> Result<(), Error> {
     // Extract some useful information from the request
     let payload = event.payload;
-    tracing::info!("Payload: {:?}", payload);
+    tracing::info!("Payload: {:#?}", payload);
 
     Ok(())
 }

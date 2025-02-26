@@ -1,4 +1,4 @@
-mod mp3_encode_i16;
+use wav_to_mp3::mp3_encode_i16;
 
 fn main() {
     let path = std::env::args().nth(1).unwrap();
