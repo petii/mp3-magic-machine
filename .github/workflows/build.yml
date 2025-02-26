@@ -18,16 +18,17 @@ jobs:
     - name: build workspace
       run: cargo build --verbose --workspace
 
-    - name: run tests
-      run: cargo test --verbose --workspace
-
   checks:
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - name: check fmt
         run: cargo fmt --verbose --all --check
+
+      - name: run tests
+        run: cargo test --verbose --workspace
 
 
   deploy:
