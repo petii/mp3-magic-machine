@@ -16,7 +16,11 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - name: Build
+    - name: Check fmt
+      run: cargo fmt --check
+    - name: Build workspace
       run: cargo build --verbose
+    - name: Build lambda
+      run: cargo lambda build
     - name: Run tests
       run: cargo test --verbose
