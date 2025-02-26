@@ -1,4 +1,4 @@
-name: Check workspace
+name: build & deploy
 
 on:
   push:
@@ -11,17 +11,33 @@ env:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v4
 
-    - name: Check fmt
+    - name: check fmt
       run: cargo fmt --check
 
-    - name: Build workspace
+    - name: build workspace
       run: cargo build --verbose
 
-    - name: Run tests
+    - name: run tests
       run: cargo test --verbose
+
+  deploy:
+    needs: build
+    if: github.ref_name == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: mlugg/setup-zig@v1.2.1
+      - name: install cargo lambda
+        run: cargo install cargo-lambda
+
+      - name: build lambda
+        run: cargo lambda build --release --arm64
+        working-directory: magic_lambda
+
+      - name: deploy lambda
+        run: cargo lambda deploy --binary-name magic_lambda
