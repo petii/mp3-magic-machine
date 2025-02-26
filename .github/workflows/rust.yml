@@ -15,20 +15,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
 
-    - name: Setup Cargo Lambda
-      uses: zerj9/setup-cargo-lambda@v0.1.2
 
     - name: Check fmt
       run: cargo fmt --check
 
     - name: Build workspace
       run: cargo build --verbose
-
-    - name: Build lambda
-      run: cargo lambda build
-      working-directory: magic_lambda
 
     - name: Run tests
       run: cargo test --verbose

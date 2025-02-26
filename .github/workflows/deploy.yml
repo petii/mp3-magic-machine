@@ -1,4 +1,4 @@
-name: deploy.yml
+name: Deploy to AWS
 on:
   workflow_run:
     workflows: [Check workspace]
@@ -9,4 +9,15 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     steps:
-      - run: echo 'Deploy to AWS'
+      - uses: actions/checkout@v4
+
+      - uses: mlugg/setup-zig@v1.2.1
+      - name: Setup Cargo Lambda
+        run: cargo install cargo-lambda
+
+      - name: Build lambda
+        run: cargo lambda build --release --arm64
+        working-directory: magic_lambda
+
+      - name: Deploy lambda
+        run: cargo lambda deploy
