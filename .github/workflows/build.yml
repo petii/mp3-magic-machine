@@ -15,17 +15,22 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: check fmt
-      run: cargo fmt --check
-
     - name: build workspace
-      run: cargo build --verbose
+      run: cargo build --verbose --workspace
 
-    - name: run tests
-      run: cargo test --verbose
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: check fmt
+        run: cargo fmt --verbose --all --check
+
+      - name: run tests
+        run: cargo test --verbose --workspace
 
   deploy:
-    needs: build
+    needs: [build, checks]
     if: github.ref_name == 'main'
     runs-on: ubuntu-latest
     steps:
@@ -36,8 +41,9 @@ jobs:
         run: cargo install cargo-lambda
 
       - name: build lambda
-        run: cargo lambda build --release --arm64
+        run: cargo lambda build --verbose --release --arm64
         working-directory: magic_lambda
 
       - name: deploy lambda
-        run: cargo lambda deploy --binary-name magic_lambda
+        run: cargo lambda deploy --verbose --binary-name magic_lambda
+        working-directory: magic_lambda
