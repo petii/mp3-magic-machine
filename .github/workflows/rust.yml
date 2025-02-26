@@ -16,6 +16,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    - name: Install cargo-lambda
+      run: cargo install cargo-lambda
     - name: Check fmt
       run: cargo fmt --check
     - name: Build workspace
