@@ -474,6 +474,7 @@ dependencies = [
  "aws_lambda_events",
  "lambda_runtime",
  "tokio",
+ "wav_to_mp3",
 ]
 
 [[package]]
