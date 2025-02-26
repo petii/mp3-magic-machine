@@ -33,7 +33,7 @@ jobs:
   deploy:
     needs: [build, checks]
     if: github.ref_name == 'main'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
 
