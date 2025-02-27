@@ -46,7 +46,8 @@ jobs:
 
     - uses: mlugg/setup-zig@v1.2.1
     - name: install cargo lambda
-      run: cargo install cargo-lambda@1.6.3
+      # TODO: v1.7 started to use rust 2024
+      run: cargo install --verbose cargo-lambda@=1.6.3
 
     - name: build lambda
       run: cargo lambda build --verbose --release --arm64
