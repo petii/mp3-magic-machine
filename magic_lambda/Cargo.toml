@@ -7,6 +7,7 @@ edition = "2021"
 aws-config = { version = "1.5.17" , features = ["behavior-version-latest"]}
 aws-sdk-s3 = "1.77.0"
 aws_lambda_events = { version = "0.15.1", default-features = false, features = ["s3"] }
+hound = "3.5.1"
 
 lambda_runtime = "0.13.0"
 tokio = { version = "1", features = ["macros"] }

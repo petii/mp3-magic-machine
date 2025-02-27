@@ -1,6 +1,21 @@
 use aws_lambda_events::event::s3::S3Event;
 use aws_lambda_events::s3::{S3Entity, S3EventRecord};
+use aws_sdk_s3::operation::get_object::GetObjectOutput;
 use lambda_runtime::{tracing, Error, LambdaEvent};
+
+fn handle_s3_object(get_object_output: GetObjectOutput) -> Result<(), Error> {
+    // get_object_output.body
+    let reader = hound::WavReader::new(get_object_output.body.into())?;
+
+    tracing::info!("opened file with wav spec: {}",reader.spec());
+
+    match reader.spec().bits_per_sample {
+        16 => tracing::debug!("this is the part where the conversion should happen"),
+        _  => tracing::error!("not 16 bits per sample")
+    }
+
+    Ok(())
+}
 
 /// This is the main body for the function.
 /// Write your code inside it.
@@ -49,6 +64,7 @@ pub(crate) async fn function_handler(event: LambdaEvent<S3Event>) -> Result<(), 
         match get_object_result {
             Ok(output) => {
                 tracing::info!("get_object() = {:#?}", output);
+                handle_s3_object(output)?;
             }
             Err(error) => {
                 tracing::error!("get_object() = {:#?}", error);
