@@ -21,6 +21,9 @@ jobs:
     - name: build workspace
       run: cargo build --verbose --workspace
 
+    - name: run tests
+      run: cargo test --verbose --workspace
+
   checks:
     runs-on: ubuntu-latest
     steps:
