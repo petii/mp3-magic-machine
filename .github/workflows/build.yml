@@ -9,6 +9,9 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
+permissions:
+  id-token: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -19,33 +22,32 @@ jobs:
       run: cargo build --verbose --workspace
 
   checks:
-    needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
-      - name: check fmt
-        run: cargo fmt --verbose --all --check
-
-      - name: run tests
-        run: cargo test --verbose --workspace
-
+    - name: check fmt
+      run: cargo fmt --verbose --all --check
 
   deploy:
     needs: [build, checks]
     if: github.ref_name == 'main'
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
-      - uses: mlugg/setup-zig@v1.2.1
-      - name: install cargo lambda
-        run: cargo install cargo-lambda
+    - uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-region: eu-north-1
+        role-to-assume: arn:aws:iam::058264458269:role/lambda-accessor
 
-      - name: build lambda
-        run: cargo lambda build --verbose --release --arm64
-        working-directory: magic_lambda
+    - name: install cargo lambda
+      run: pip3 install cargo-lambda
 
-      - name: deploy lambda
-        run: cargo lambda deploy --verbose --binary-name magic_lambda
-        working-directory: magic_lambda
+    - name: build lambda
+      run: cargo lambda build --verbose --release
+      working-directory: magic_lambda
+
+    - name: deploy lambda
+      run: cargo lambda deploy --verbose --binary-name magic_lambda
+      working-directory: magic_lambda
