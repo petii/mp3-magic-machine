@@ -49,7 +49,7 @@ pub(crate) async fn function_handler(event: LambdaEvent<S3Event>) -> Result<(), 
         match get_object_result {
             Ok(output) => {
                 tracing::info!("get_object() = {:#?}", output);
-            },
+            }
             Err(error) => {
                 tracing::error!("get_object() = {:#?}", error);
                 return Err(error.into());
