@@ -13,3 +13,4 @@ lambda_runtime = "0.13.0"
 tokio = { version = "1", features = ["macros"] }
 
 wav_to_mp3 = { path = "../wav_to_mp3" }
+tokio-util = "0.7.13"
