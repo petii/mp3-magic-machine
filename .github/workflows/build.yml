@@ -35,7 +35,7 @@ jobs:
   deploy:
     needs: [build, checks]
     if: github.ref_name == 'main'
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
 
@@ -44,12 +44,11 @@ jobs:
         aws-region: eu-north-1
         role-to-assume: arn:aws:iam::058264458269:role/lambda-accessor
 
-    - uses: mlugg/setup-zig@v1.2.1
     - name: install cargo lambda
       run: pip3 install cargo-lambda
 
     - name: build lambda
-      run: cargo lambda build --verbose --release --arm64
+      run: cargo lambda build --verbose --release
       working-directory: magic_lambda
 
     - name: deploy lambda
