@@ -1,18 +1,38 @@
 use aws_lambda_events::event::s3::S3Event;
 use aws_lambda_events::s3::{S3Entity, S3EventRecord};
 use aws_sdk_s3::operation::get_object::GetObjectOutput;
+use aws_sdk_s3::primitives::ByteStream;
+use hound::WavReader;
 use lambda_runtime::{tracing, Error, LambdaEvent};
+use std::io;
+use std::io::Bytes;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncRead, ReadBuf};
+use tokio_util::bytes;
+use tokio_util::io::{ReaderStream, StreamReader};
+
+struct ByteStreamReader(ByteStream);
+
+impl std::io::Read for ByteStreamReader {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        // let next: Option<bytes::Bytes> = self.0.try_next();
+
+        Ok(0)
+    }
+}
 
 fn handle_s3_object(get_object_output: GetObjectOutput) -> Result<(), Error> {
-    // get_object_output.body
-    let reader = hound::WavReader::new(get_object_output.body.into())?;
+    let object_body = get_object_output.body;
 
-    tracing::info!("opened file with wav spec: {}", reader.spec());
+    let reader = WavReader::new(ByteStreamReader(object_body))?;
 
-    match reader.spec().bits_per_sample {
-        16 => tracing::debug!("this is the part where the conversion should happen"),
-        _ => tracing::error!("not 16 bits per sample"),
-    }
+    tracing::info!("opened file with wav spec: {:#?}", reader.spec());
+
+    // match reader.spec.bits_per_sample {
+    //     16 => tracing::debug!("this is the part where the conversion should happen"),
+    //     _ => tracing::error!("not 16 bits per sample"),
+    // }
 
     Ok(())
 }
@@ -78,8 +98,8 @@ pub(crate) async fn function_handler(event: LambdaEvent<S3Event>) -> Result<(), 
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use lambda_runtime::{Context, LambdaEvent};
+    // use super::*;
+    // use lambda_runtime::{Context, LambdaEvent};
 
     // #[tokio::test]
     // async fn test_event_handler() {

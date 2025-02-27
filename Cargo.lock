@@ -1435,6 +1435,7 @@ dependencies = [
  "hound",
  "lambda_runtime",
  "tokio",
+ "tokio-util",
  "wav_to_mp3",
 ]
 
