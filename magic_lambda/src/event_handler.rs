@@ -7,11 +7,11 @@ fn handle_s3_object(get_object_output: GetObjectOutput) -> Result<(), Error> {
     // get_object_output.body
     let reader = hound::WavReader::new(get_object_output.body.into())?;
 
-    tracing::info!("opened file with wav spec: {}",reader.spec());
+    tracing::info!("opened file with wav spec: {}", reader.spec());
 
     match reader.spec().bits_per_sample {
         16 => tracing::debug!("this is the part where the conversion should happen"),
-        _  => tracing::error!("not 16 bits per sample")
+        _ => tracing::error!("not 16 bits per sample"),
     }
 
     Ok(())
