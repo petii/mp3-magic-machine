@@ -24,27 +24,26 @@ jobs:
   checks:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
-      - name: check fmt
-        run: cargo fmt --verbose --all --check
-
+    - name: check fmt
+      run: cargo fmt --verbose --all --check
 
   deploy:
     needs: [build, checks]
     if: github.ref_name == 'main'
     runs-on: ubuntu-24.04-arm
     steps:
-      - uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
-      - uses: mlugg/setup-zig@v1.2.1
-      - name: install cargo lambda
-        run: cargo install cargo-lambda
+    - uses: mlugg/setup-zig@v1.2.1
+    - name: install cargo lambda
+      run: cargo install cargo-lambda
 
-      - name: build lambda
-        run: cargo lambda build --verbose --release --arm64
-        working-directory: magic_lambda
+    - name: build lambda
+      run: cargo lambda build --verbose --release --arm64
+      working-directory: magic_lambda
 
-      - name: deploy lambda
-        run: cargo lambda deploy --verbose --binary-name magic_lambda
-        working-directory: magic_lambda
+    - name: deploy lambda
+      run: cargo lambda deploy --verbose --binary-name magic_lambda
+      working-directory: magic_lambda
