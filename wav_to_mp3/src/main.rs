@@ -15,7 +15,9 @@ fn main() {
     let spec = wav_reader.spec();
     dbg!(spec);
     match spec.bits_per_sample {
-        16 => mp3_encode_i16::from_reader(wav_reader, out, base_name),
+        16 => {
+            mp3_encode_i16::from_reader(wav_reader, out, base_name);
+        }
         _ => unimplemented!(),
     }
 }
