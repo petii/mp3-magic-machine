@@ -31,7 +31,6 @@ async fn handle_s3_object(
 
     match reader.spec().bits_per_sample {
         16 => {
-            tracing::debug!("this is the part where the conversion should happen");
             let files = wav_to_mp3::mp3_encode_i16::from_reader(
                 reader,
                 Path::new("/tmp"),
@@ -58,7 +57,6 @@ pub(crate) async fn function_handler(event: LambdaEvent<S3Event>) -> Result<(), 
     // Extract some useful information from the request
     let payload = event.payload;
 
-    let s3_client;
     if payload.records.len() < 1 {
         tracing::info!("no records; nothing to do");
         return Ok(());
@@ -67,8 +65,8 @@ pub(crate) async fn function_handler(event: LambdaEvent<S3Event>) -> Result<(), 
     let sdk_config = aws_config::load_from_env().await;
     tracing::trace!("sdk config = {:?}", sdk_config);
 
-    s3_client = aws_sdk_s3::Client::new(&sdk_config);
-    tracing::trace!("s3 client = {:?}", s3_client);
+    let s3_client = aws_sdk_s3::Client::new(&sdk_config);
+    // tracing::trace!("s3 client = {:?}", s3_client);
 
     for record in payload.records {
         tracing::debug!("{:?}", record);
@@ -100,28 +98,37 @@ pub(crate) async fn function_handler(event: LambdaEvent<S3Event>) -> Result<(), 
 
         let (tx, rx) = flume::unbounded();
 
-        handle_s3_object(get_object_result, tx).await?;
+        let streamer_converter = handle_s3_object(get_object_result, tx);
 
-        while let Ok(file) = rx.recv() {
-            tracing::info!("received written file = {:?}", file);
-            s3_client
-                .put_object()
-                .bucket(bucket_name.clone().unwrap())
-                .key(format!(
-                    "{}-{}",
-                    key.clone().unwrap(),
-                    file.components()
-                        .last()
-                        .unwrap()
-                        .as_os_str()
-                        .to_os_string()
-                        .into_string()
-                        .unwrap()
-                ))
-                .body(ByteStream::from_path(file).await?)
-                .send()
-                .await?;
-        }
+        let sdk_config_clone = sdk_config.clone();
+
+        let file_uploader_handle: JoinHandle<Result<(), Error>> = tokio::spawn(async move {
+            let s3_putter = aws_sdk_s3::Client::new(&sdk_config_clone);
+            while let Ok(file) = rx.recv() {
+                tracing::info!("received written file = {:?}", file);
+                s3_putter
+                    .put_object()
+                    .bucket(bucket_name.clone().unwrap())
+                    .key(format!(
+                        "{}-{}",
+                        key.clone().unwrap(),
+                        file.components()
+                            .last()
+                            .unwrap()
+                            .as_os_str()
+                            .to_os_string()
+                            .into_string()
+                            .unwrap()
+                    ))
+                    .body(ByteStream::from_path(file).await?)
+                    .send()
+                    .await?;
+            }
+            Ok(())
+        });
+
+        streamer_converter.await?;
+        file_uploader_handle.await??;
     }
 
     Ok(())
