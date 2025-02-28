@@ -1,4 +1,5 @@
 use mp3lame_encoder as mp3;
+use std::path::PathBuf;
 
 type SampleType = i16;
 
@@ -51,10 +52,12 @@ pub fn from_reader<R: std::io::Read>(
     reader: hound::WavReader<R>,
     out_dir: &std::path::Path,
     base_name: &str,
-) {
+) -> Vec<PathBuf> {
     use std::path::Path;
 
     let sample_rate = reader.spec().sample_rate;
+
+    let mut results = Vec::new();
 
     match reader.spec().channels {
         1 => unimplemented!(),
@@ -82,16 +85,22 @@ pub fn from_reader<R: std::io::Read>(
             }
 
             let mp3_buffer = encode_mono_mp3(sample_rate, &left_samples);
+            results.push(left_mp3.clone());
             std::fs::write(left_mp3, mp3_buffer).unwrap();
 
             let mp3_buffer = encode_mono_mp3(sample_rate, &right_samples);
+            results.push(right_mp3.clone());
             std::fs::write(right_mp3, mp3_buffer).unwrap();
 
             let mp3_buffer = encode_stereo_mp3(sample_rate, &left_samples, &right_samples);
-            std::fs::write(out_dir.join(format!("{base_name}.mp3")), mp3_buffer).unwrap();
+            let stereo_mp3 = out_dir.join(Path::new(base_name).with_extension("mp3"));
+            results.push(stereo_mp3.clone());
+            std::fs::write(stereo_mp3, mp3_buffer).unwrap();
         }
         _ => unimplemented!(),
     }
+
+    results
 }
 
 #[cfg(test)]
