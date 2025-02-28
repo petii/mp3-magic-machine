@@ -13,6 +13,14 @@ permissions:
   id-token: write
 
 jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: check fmt
+        run: cargo fmt --verbose --all --check
+
   build:
     runs-on: ubuntu-latest
     steps:
@@ -23,14 +31,6 @@ jobs:
 
     - name: run tests
       run: cargo test --verbose --workspace
-
-  checks:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: check fmt
-      run: cargo fmt --verbose --all --check
 
   deploy:
     needs: [build, checks]
