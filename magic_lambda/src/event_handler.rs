@@ -1,38 +1,35 @@
 use aws_lambda_events::event::s3::S3Event;
 use aws_lambda_events::s3::{S3Entity, S3EventRecord};
 use aws_sdk_s3::operation::get_object::GetObjectOutput;
-use aws_sdk_s3::primitives::ByteStream;
+use channel_io::ChannelReader;
 use hound::WavReader;
 use lambda_runtime::{tracing, Error, LambdaEvent};
-use std::io;
-use std::io::Bytes;
-use std::pin::Pin;
-use std::task::{Context, Poll};
-use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncRead, ReadBuf};
-use tokio_util::bytes;
-use tokio_util::io::{ReaderStream, StreamReader};
+use tokio::task::JoinHandle;
 
-struct ByteStreamReader(ByteStream);
+async fn handle_s3_object(get_object_output: GetObjectOutput) -> Result<(), Error> {
+    let mut object_body = get_object_output.body;
 
-impl std::io::Read for ByteStreamReader {
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        // let next: Option<bytes::Bytes> = self.0.try_next();
+    let (tx, rx) = flume::unbounded();
 
-        Ok(0)
-    }
-}
+    let body_bytestream_reader_handle: JoinHandle<Result<(), Error>> = tokio::spawn(async move {
+        while let Some(body) = object_body.try_next().await.map_err(Box::new)? {
+            tx.send(body).map_err(Box::new)?;
+        }
+        Ok(())
+    });
 
-fn handle_s3_object(get_object_output: GetObjectOutput) -> Result<(), Error> {
-    let object_body = get_object_output.body;
+    let object_channel_reader = ChannelReader::new(rx);
 
-    let reader = WavReader::new(ByteStreamReader(object_body))?;
+    let reader = WavReader::new(object_channel_reader)?;
 
-    tracing::info!("opened file with wav spec: {:#?}", reader.spec());
+    tracing::info!("opened file with wav spec: {:?}", reader.spec());
 
     // match reader.spec.bits_per_sample {
     //     16 => tracing::debug!("this is the part where the conversion should happen"),
     //     _ => tracing::error!("not 16 bits per sample"),
     // }
+
+    body_bytestream_reader_handle.await??;
 
     Ok(())
 }
@@ -43,9 +40,6 @@ fn handle_s3_object(get_object_output: GetObjectOutput) -> Result<(), Error> {
 /// - https://github.com/awslabs/aws-lambda-rust-runtime/tree/main/examples
 /// - https://github.com/aws-samples/serverless-rust-demo/
 pub(crate) async fn function_handler(event: LambdaEvent<S3Event>) -> Result<(), Error> {
-    let lambda_runtime_config = lambda_runtime::Config::from_env();
-    tracing::info!("lambda runtime config = {:#?}", lambda_runtime_config);
-
     // Extract some useful information from the request
     let payload = event.payload;
 
@@ -56,13 +50,13 @@ pub(crate) async fn function_handler(event: LambdaEvent<S3Event>) -> Result<(), 
     }
 
     let sdk_config = aws_config::load_from_env().await;
-    tracing::trace!("sdk config = {:#?}", sdk_config);
+    tracing::trace!("sdk config = {:?}", sdk_config);
 
     s3_client = aws_sdk_s3::Client::new(&sdk_config);
-    tracing::trace!("s3 client = {:#?}", s3_client);
+    tracing::trace!("s3 client = {:?}", s3_client);
 
     for record in payload.records {
-        tracing::debug!("{:#?}", record);
+        tracing::debug!("{:?}", record);
 
         let S3EventRecord {
             event_time,
@@ -70,7 +64,7 @@ pub(crate) async fn function_handler(event: LambdaEvent<S3Event>) -> Result<(), 
             ..
         } = record;
 
-        tracing::info!("at {event_time}: s3 entity = {:#?}", event_entity);
+        tracing::info!("at {event_time}: s3 entity = {:?}", event_entity);
 
         let S3Entity { bucket, object, .. } = event_entity;
 
@@ -83,11 +77,11 @@ pub(crate) async fn function_handler(event: LambdaEvent<S3Event>) -> Result<(), 
 
         match get_object_result {
             Ok(output) => {
-                tracing::info!("get_object() = {:#?}", output);
-                handle_s3_object(output)?;
+                tracing::info!("get_object() = {:?}", output);
+                handle_s3_object(output).await?;
             }
             Err(error) => {
-                tracing::error!("get_object() = {:#?}", error);
+                tracing::error!("get_object() = {:?}", error);
                 return Err(error.into());
             }
         }
@@ -98,13 +92,13 @@ pub(crate) async fn function_handler(event: LambdaEvent<S3Event>) -> Result<(), 
 
 #[cfg(test)]
 mod tests {
-    // use super::*;
-    // use lambda_runtime::{Context, LambdaEvent};
+    use super::*;
+    use lambda_runtime::{Context, LambdaEvent};
 
-    // #[tokio::test]
-    // async fn test_event_handler() {
-    //     let event = LambdaEvent::new(S3Event::default(), Context::default());
-    //     let response = function_handler(event).await;
-    //     assert!(response.is_err());
-    // }
+    #[tokio::test]
+    async fn test_event_handler() {
+        let event = LambdaEvent::new(S3Event::default(), Context::default());
+        let response = function_handler(event).await.unwrap();
+        assert_eq!(dbg!(response), ());
+    }
 }
