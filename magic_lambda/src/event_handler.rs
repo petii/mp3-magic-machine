@@ -151,7 +151,7 @@ pub(crate) async fn function_handler(event: LambdaEvent<S3Event>) -> Result<(), 
             .with_extension("zip"),
     )?;
 
-    tracing::info!("archive = {archive}");
+    tracing::info!("archive = {}", archive.display());
 
     s3_client
         .put_object()
