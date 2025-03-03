@@ -5,20 +5,35 @@ use aws_sdk_s3::primitives::ByteStream;
 use channel_io::ChannelReader;
 use hound::WavReader;
 use lambda_runtime::{tracing, Error, LambdaEvent};
+use std::fs::File;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use tokio::task::JoinHandle;
+use tokio::task::{yield_now, JoinHandle};
+use zip::write::SimpleFileOptions;
+
+static PROJECT_BUCKET: &str = "ppp-globalbucket-1";
+static ARCHIVE_KEY_BASE: &str = "mp3-magic-machine/archive";
 
 async fn handle_s3_object(
+    object_key: String,
     get_object_output: GetObjectOutput,
-    result_path_sender: flume::Sender<PathBuf>,
-) -> Result<(), Error> {
+) -> Result<Vec<PathBuf>, Error> {
     let mut object_body = get_object_output.body;
+    let key_last = object_key
+        .split('/')
+        .last()
+        .unwrap()
+        .rsplit('.')
+        .skip(1)
+        .collect::<Vec<&str>>()
+        .join("");
 
     let (tx, rx) = flume::unbounded();
 
     let body_bytestream_reader_handle: JoinHandle<Result<(), Error>> = tokio::spawn(async move {
         while let Some(body) = object_body.try_next().await.map_err(Box::new)? {
             tx.send(body).map_err(Box::new)?;
+            yield_now().await;
         }
         Ok(())
     });
@@ -29,23 +44,43 @@ async fn handle_s3_object(
 
     tracing::info!("opened file with wav spec: {:?}", reader.spec());
 
+    let mut all_files = Vec::<PathBuf>::new();
+
     match reader.spec().bits_per_sample {
         16 => {
-            let files = wav_to_mp3::mp3_encode_i16::from_reader(
-                reader,
-                Path::new("/tmp"),
-                "smarter-naming",
-            );
-            for file in files {
-                result_path_sender.send(file)?;
-            }
+            let files =
+                wav_to_mp3::mp3_encode_i16::from_reader(reader, Path::new("/tmp"), &key_last[..]);
+            all_files.extend(files)
         }
         _ => tracing::error!("not 16 bits per sample"),
     }
 
     body_bytestream_reader_handle.await??;
 
-    Ok(())
+    Ok(all_files)
+}
+
+fn compress_files(files: Vec<PathBuf>, output: PathBuf) -> Result<PathBuf, Error> {
+    let out_file = File::create(output.clone())?;
+
+    let mut zip = zip::ZipWriter::new(out_file);
+
+    let mut buffer = Vec::new();
+
+    for file in files {
+        let file_name = file.file_name().unwrap().to_str().unwrap();
+        let mut file_handle = std::fs::File::open(&file)?;
+        file_handle.read_to_end(&mut buffer)?;
+
+        zip.start_file(file_name, SimpleFileOptions::default())?;
+        zip.write_all(&buffer)?;
+
+        buffer.clear();
+    }
+
+    zip.finish()?;
+
+    Ok(output)
 }
 
 /// This is the main body for the function.
@@ -66,7 +101,9 @@ pub(crate) async fn function_handler(event: LambdaEvent<S3Event>) -> Result<(), 
     tracing::trace!("sdk config = {:?}", sdk_config);
 
     let s3_client = aws_sdk_s3::Client::new(&sdk_config);
-    // tracing::trace!("s3 client = {:?}", s3_client);
+
+    let mut all_files = Vec::<PathBuf>::new();
+    let mut last_event_time = chrono::Utc::now();
 
     for record in payload.records {
         tracing::debug!("{:?}", record);
@@ -96,40 +133,33 @@ pub(crate) async fn function_handler(event: LambdaEvent<S3Event>) -> Result<(), 
 
         tracing::info!("get_object() = {:?}", get_object_result);
 
-        let (tx, rx) = flume::unbounded();
+        let files = handle_s3_object(key.unwrap(), get_object_result).await?;
+        all_files.extend(files);
 
-        let streamer_converter = handle_s3_object(get_object_result, tx);
-
-        let sdk_config_clone = sdk_config.clone();
-
-        let file_uploader_handle: JoinHandle<Result<(), Error>> = tokio::spawn(async move {
-            let s3_putter = aws_sdk_s3::Client::new(&sdk_config_clone);
-            while let Ok(file) = rx.recv() {
-                tracing::info!("received written file = {:?}", file);
-                s3_putter
-                    .put_object()
-                    .bucket(bucket_name.clone().unwrap())
-                    .key(format!(
-                        "{}-{}",
-                        key.clone().unwrap(),
-                        file.components()
-                            .last()
-                            .unwrap()
-                            .as_os_str()
-                            .to_os_string()
-                            .into_string()
-                            .unwrap()
-                    ))
-                    .body(ByteStream::from_path(file).await?)
-                    .send()
-                    .await?;
-            }
-            Ok(())
-        });
-
-        streamer_converter.await?;
-        file_uploader_handle.await??;
+        last_event_time = event_time;
     }
+
+    let date_as_key = last_event_time.format("%Y/%m-%d");
+    let output_key = format!("{ARCHIVE_KEY_BASE}/{date_as_key}.zip");
+
+    tracing::info!("output_key = {output_key}");
+
+    let archive = compress_files(
+        all_files,
+        Path::new("/tmp")
+            .join(format!("{}", last_event_time.format("%Y-%m-%d")))
+            .with_extension("zip"),
+    )?;
+
+    tracing::info!("archive = {archive}");
+
+    s3_client
+        .put_object()
+        .bucket(PROJECT_BUCKET)
+        .key(output_key)
+        .body(ByteStream::from_path(archive).await?)
+        .send()
+        .await?;
 
     Ok(())
 }
