@@ -2,9 +2,16 @@ name: build & deploy
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ 'main' ]
+    paths-ignore:
+      - 'index.html'
+      - 'jamcore/**'
   pull_request:
-    branches: [ "main" ]
+    branches: [ 'main' ]
+    paths-ignore:
+      - 'index.html'
+      - 'jamcore/**'
+
 
 env:
   CARGO_TERM_COLOR: always
@@ -24,33 +31,33 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: build workspace
-      run: cargo build --verbose --workspace
+      - name: build workspace
+        run: cargo build --verbose --workspace
 
-    - name: run tests
-      run: cargo test --verbose --workspace
+      - name: run tests
+        run: cargo test --verbose --workspace
 
   deploy:
     needs: [build, checks]
     if: github.ref_name == 'main'
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - uses: aws-actions/configure-aws-credentials@v4
-      with:
-        aws-region: eu-north-1
-        role-to-assume: arn:aws:iam::058264458269:role/lambda-accessor
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: eu-north-1
+          role-to-assume: arn:aws:iam::058264458269:role/lambda-accessor
 
-    - name: install cargo lambda
-      run: pip3 install cargo-lambda
+      - name: install cargo lambda
+        run: pip3 install cargo-lambda
 
-    - name: build lambda
-      run: cargo lambda build --verbose --release
-      working-directory: magic_lambda
+      - name: build lambda
+        run: cargo lambda build --verbose --release
+        working-directory: magic_lambda
 
-    - name: deploy lambda
-      run: cargo lambda deploy --verbose --binary-name magic_lambda
-      working-directory: magic_lambda
+      - name: deploy lambda
+        run: cargo lambda deploy --verbose --binary-name magic_lambda
+        working-directory: magic_lambda
