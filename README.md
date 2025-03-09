@@ -1,4 +1,4 @@
-# M^3 $\rightarrow$ the MP3 Magic Machine
+# M<sup>3</sup> $\rightarrow$ the MP3 Magic Machine
 A learning project which also is hopefully solving a real problem (at least for me.)
 
 **Background:**
